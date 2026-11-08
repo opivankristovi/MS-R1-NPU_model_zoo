@@ -22,7 +22,7 @@ SAMPLE = {"detect": "street.jpg", "faces": "faces.jpg", "embed": "dog.jpg", "seg
           "pose": "people.jpg", "depth": "room.jpg", "enhance": "small.png", "agllnet": "lowlight.png",
           "pairlie": "lowlight.png", "night_dehaze": "night_haze.png", "handpose": "hand.jpg",
           "u2net": "portrait.jpg", "pphumanseg": "people.jpg"}
-EXTRA = {"face_id": {"ref": "face_a.jpg"}, "sam2": {"points": "900,600,1"}}
+EXTRA = {"face_id": {"ref": "face_a.jpg"}, "sam2": {"points": "1100,700,1"}}
 
 
 def summary(res):

@@ -49,7 +49,7 @@ rebuild. The smoke test exits 1 if any model failed; look at the images in `out/
 * **Don't run the hub's own scripts or install its requirements** (`$MODELS/hub/...*.py`, torch, the hub
   venv). Read them for reference only. All inference goes through `zoo/npu.py`.
 * **Don't edit `zoo/` for one app's needs.** Wrap or subclass in the app. Fix bugs in `zoo/` when they're
-  generic, then run `docker compose run --rm smoke python tests/smoke.py <model>`.
+  generic, then run `/smoke <model>`.
 * **The NPU may be shared** with other long-running services. The kernel driver queues jobs, so concurrent
   use is fine, but heavy loops (Real-ESRGAN, SigLIP) slow the others down: give them a low duty cycle or a queue.
 * **Ports:** the demo uses 8097 and the template 8098. Pick something free (8100+) for new apps.
@@ -86,24 +86,15 @@ Lower-level building blocks:
 * `zoo.common.letterbox`, `nms`, `topleft_pad`
 * `zoo.npu.Graph(path).run([inputs]) -> [flat float32 outputs]` for a raw `.cix` (quantization handled)
 
-## Starting a new app
-1. Copy the template: `cp -r apps/_template apps/<name>`. Rename the service and port in `compose.yml`.
-2. Load models at import or startup, not per request. Loading takes 0.1–3 s and NPU memory.
-   SAM2's encoder and SigLIP's text tower are the heavy ones.
-3. Keep CPU work off the hot path: decode with OpenCV and downscale big photos (the models see ≤ 640 px anyway).
-4. Run it with `docker compose -f apps/<name>/compose.yml up -d --build`.
-5. Test it with real data (`samples/` or your own) and look at the output images yourself. Several hub
-   models fail silently with plausible-looking numbers.
-6. Write `apps/<name>/README.md` with what the app does, how to run it, and measured speed.
+## Skills and agents (`.claude/`)
+* `/smoke [model ...]`: run the smoke test and check every output image, not just the exit code.
+* `/new-app <name> <purpose>`: scaffold an app from `apps/_template`, run it, test it on real data, document it.
+* `/wrap-model <hub model>`: add a hub model the zoo doesn't wrap yet, from the hub reference to the README row.
+* `output-checker` subagent: judges whether a model's output drawing is plausible for its input. The skills
+  call it; use it whenever a model or app produces images. Several hub models fail silently with
+  plausible-looking numbers.
 
-## Adding a hub model that isn't wrapped yet
-1. Fetch the `.cix`: add it to `tools/fetch_models.sh` and run it.
-2. Read the hub's `inference_npu.py` and the helpers it calls in `$MODELS/hub/utils/` for
-   preprocessing (size, RGB/BGR, mean/std, padding) and output reshapes.
-3. Print the tensor descriptors: `Graph(p).ins` / `.outs` show the dtype and quant scale. A uint8 input with
-   scale 1 means raw 0..255; scale 255 means 0..1.
-4. Write a class following the API above, add it to `zoo.MODELS`, and run the smoke test. Compare against the
-   fp32 ONNX on the CPU (onnxruntime is in the image) when the output looks off.
+`.claude/settings.json` allows the routine build, smoke and app commands without prompting.
 
 ## Gotchas (learned the hard way)
 * **YOLO-World:**
