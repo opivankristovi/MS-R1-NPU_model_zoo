@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NPU Model Zoo</title>
+<style>
+:root{--bg:#f6f6f4;--panel:#fff;--ink:#1d1d1b;--mute:#6b6b66;--line:#e2e2dc;--acc:#2f6fdb;--acc-ink:#fff;--sel:#e8effc;--ok:#1f8a4c}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--panel:#1d1d1d;--ink:#ececea;--mute:#9a9a94;--line:#2e2e2c;--acc:#6b9cf0;--acc-ink:#0b0b0b;--sel:#22314d;--ok:#4cc27f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:baseline}
+header h1{font-size:17px;margin:0}
+header span{color:var(--mute);font-size:13px}
+.wrap{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 52px)}
+nav{border-right:1px solid var(--line);padding:10px;overflow:auto;max-height:calc(100vh - 52px)}
+nav h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:14px 8px 4px}
+nav button{display:block;width:100%;text-align:left;border:0;background:none;color:var(--ink);padding:6px 8px;border-radius:6px;cursor:pointer;font:inherit}
+nav button:hover{background:var(--line)}
+nav button.on{background:var(--sel);font-weight:600}
+nav button .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-left:6px;vertical-align:middle}
+main{padding:18px 22px;min-width:0}
+.desc{color:var(--mute);margin:2px 0 14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mute);gap:3px}
+input[type=text],input[type=number]{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;min-width:90px}
+input.wide{min-width:340px}
+.samples{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.samples img{width:72px;height:54px;object-fit:cover;border-radius:5px;border:2px solid transparent;cursor:pointer}
+.samples img.on{border-color:var(--acc)}
+button.run{background:var(--acc);color:var(--acc-ink);border:0;border-radius:7px;padding:8px 18px;font:inherit;font-weight:600;cursor:pointer}
+button.run:disabled{opacity:.5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.imgbox{position:relative;background:var(--bg);border-radius:8px;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.imgbox img{max-width:100%;max-height:70vh;display:block}
+.imgbox.click img{cursor:crosshair}
+.checker{background-image:linear-gradient(45deg,#8883 25%,transparent 25%,transparent 75%,#8883 75%),linear-gradient(45deg,#8883 25%,transparent 25%,transparent 75%,#8883 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.cap{font-size:12px;color:var(--mute);margin:6px 2px}
+pre{background:var(--bg);border-radius:8px;padding:10px;overflow:auto;max-height:340px;font-size:12px;margin:0}
+.ms{font-variant-numeric:tabular-nums}
+.err{color:#d33}
+@media (max-width:820px){.wrap{grid-template-columns:1fr}nav{max-height:none;border-right:0;border-bottom:1px solid var(--line)}.grid{grid-template-columns:1fr}input.wide{min-width:0;width:100%}}
+</style>
+</head>
+<body>
+<header><h1>NPU Model Zoo</h1><span>CIX P1 · Zhouyi X2 NPU · green dot = loaded</span></header>
+<div class="wrap">
+<nav id="nav"></nav>
+<main>
+  <h2 id="title" style="margin:0;font-size:20px">Pick a model</h2>
+  <p class="desc" id="desc"></p>
+  <div class="card">
+    <div class="row">
+      <label>Image<input type="file" id="file" accept="image/*"></label>
+      <span id="params" class="row"></span>
+      <button class="run" id="run" disabled>Run</button>
+    </div>
+    <div class="samples" id="samples"></div>
+    <div class="cap" id="hint"></div>
+  </div>
+  <div class="grid">
+    <div><div class="imgbox" id="inbox"><img id="inimg" alt=""></div><div class="cap">input</div></div>
+    <div><div class="imgbox" id="outbox"><img id="outimg" alt=""></div><div class="cap" id="outcap">result</div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><div class="cap ms" id="ms"></div><pre id="json"></pre></div>
+</main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+let models = {}, cur = null, sample = null, file = null, points = [];
+const ORDER = ["detect","faces","embed","segment","pose","depth","enhance"];
+const TASKN = {detect:"Detection",faces:"Faces",embed:"Zero-shot / embeddings",segment:"Segmentation",pose:"Pose",depth:"Depth",enhance:"Enhancement"};
+const DEF_SAMPLE = {detect:"street.jpg",faces:"faces.jpg",embed:"dog.jpg",segment:"truck.jpg",pose:"people.jpg",depth:"room.jpg",enhance:"small.png",
+                    agllnet:"lowlight.png",pairlie:"lowlight.png",night_dehaze:"night_haze.png",handpose:"hand.jpg",u2net:"portrait.jpg",pphumanseg:"people.jpg",age_gender:"faces.jpg"};
+
+async function init(){
+  models = await (await fetch("api/models")).json();
+  const nav = $("nav"); nav.innerHTML = "";
+  for (const t of ORDER){
+    const h = document.createElement("h3"); h.textContent = TASKN[t]; nav.appendChild(h);
+    for (const [k,v] of Object.entries(models)) if (v.task===t){
+      const b = document.createElement("button"); b.dataset.k = k;
+      b.innerHTML = k + (v.loaded ? '<span class="dot"></span>' : "");
+      b.onclick = () => pick(k); nav.appendChild(b);
+    }
+  }
+  const s = await (await fetch("api/samples")).json();
+  $("samples").innerHTML = "";
+  for (const f of s){
+    const im = document.createElement("img"); im.src = "samples/"+encodeURIComponent(f); im.title = f; im.dataset.f = f;
+    im.onclick = () => useSample(f); $("samples").appendChild(im);
+  }
+  const k = location.hash.slice(1); pick(models[k] ? k : "yolov8_l");
+}
+function useSample(f){
+  sample = f; file = null; $("file").value = ""; points = [];
+  document.querySelectorAll(".samples img").forEach(i => i.classList.toggle("on", i.dataset.f===f));
+  $("inimg").src = "samples/"+encodeURIComponent(f); $("run").disabled = !cur;
+  if ($("p_points")) $("p_points").value = "";
+}
+$("file").onchange = e => {
+  file = e.target.files[0]; if (!file) return; sample = null; points = [];
+  document.querySelectorAll(".samples img").forEach(i => i.classList.remove("on"));
+  $("inimg").src = URL.createObjectURL(file); $("run").disabled = !cur;
+};
+function pick(k){
+  cur = k; location.hash = k; const m = models[k];
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.k===k));
+  $("title").textContent = k; $("desc").textContent = m.desc;
+  const P = $("params"); P.innerHTML = "";
+  for (const [p,{type,default:d}] of Object.entries(m.params)){
+    const l = document.createElement("label"); l.textContent = p;
+    const i = document.createElement("input"); i.id = "p_"+p;
+    if (type==="image"){ i.type = "file"; i.accept = "image/*"; }
+    else { i.type = (type==="str") ? "text" : "number"; if (type==="float") i.step = "0.05";
+           i.value = d ?? ""; if (type==="str") i.className = "wide"; }
+    l.appendChild(i); P.appendChild(l);
+  }
+  $("inbox").classList.toggle("click", k==="sam2");
+  $("hint").textContent = k==="sam2" ? "Click the input image to add points (shift-click = exclude), then Run." :
+                          k==="face_id" ? "Optional: pick a reference photo of one person; faces get their similarity to it." :
+                          k==="handpose" ? "Use an image cropped to a single hand." : "";
+  if (!file && (!sample || true)) useSample(DEF_SAMPLE[k] || DEF_SAMPLE[m.task]);
+}
+$("inimg").onclick = e => {
+  if (cur!=="sam2") return;
+  const r = e.target.getBoundingClientRect(), im = e.target;
+  const x = Math.round((e.clientX-r.left)*im.naturalWidth/r.width), y = Math.round((e.clientY-r.top)*im.naturalHeight/r.height);
+  points.push(`${x},${y},${e.shiftKey?0:1}`); $("p_points").value = points.join(";");
+};
+$("run").onclick = async () => {
+  const fd = new FormData();
+  if (file) fd.append("image", file); else fd.append("sample", sample);
+  for (const [p,{type}] of Object.entries(models[cur].params)){
+    const i = $("p_"+p); if (!i) continue;
+    if (type==="image"){ if (i.files[0]) fd.append(p, i.files[0]); } else fd.append(p, i.value);
+  }
+  $("run").disabled = true; $("run").textContent = "Running…"; $("ms").textContent = ""; $("json").textContent = "";
+  try{
+    const r = await fetch("api/run/"+cur, {method:"POST", body:fd}); const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.status);
+    $("outimg").src = j.image;
+    $("outbox").classList.toggle("checker", cur==="u2net");
+    $("outcap").textContent = `result ${j.out_size[0]}×${j.out_size[1]}`;
+    $("ms").textContent = `decode ${j.ms.decode} ms · load(first use)+inference+draw ${j.ms.infer} ms · encode ${j.ms.draw} ms`;
+    const shown = JSON.stringify(j.result, (k,v) => k==="emb" ? `[${v.length} floats]` : v, 1);
+    $("json").textContent = shown.length > 20000 ? shown.slice(0,20000)+"\n…" : shown;
+    if (!models[cur].loaded){ models[cur].loaded = true; init_nav_dot(cur); }
+  }catch(e){ $("json").innerHTML = '<span class="err"></span>'; $("json").firstChild.textContent = "Error: "+e.message; }
+  $("run").disabled = false; $("run").textContent = "Run";
+};
+function init_nav_dot(k){ const b = document.querySelector(`nav button[data-k="${k}"]`); if (b && !b.querySelector(".dot")) b.insertAdjacentHTML("beforeend",'<span class="dot"></span>'); }
+init();
+</script>
+</body>
+</html>

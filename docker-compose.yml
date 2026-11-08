@@ -1,0 +1,37 @@
+# CIX P1 NPU model zoo. `docker compose up -d demo` -> http://<board>:8097
+name: npuzoo
+
+x-npu: &npu
+  image: npu-zoo
+  devices: [/dev/aipu]
+  restart: unless-stopped
+  environment:
+    ZOO_HUB: /hub
+    HF_HOME: /hf
+  volumes:
+    - ${MODELS:-/mnt/data/npu-models}/hub/models:/hub:ro
+    - ${MODELS:-/mnt/data/npu-models}/hf:/hf
+    - ./zoo:/zoo-src/zoo:ro          # live code: edit + restart, no rebuild
+    - ./demo:/zoo-src/demo:ro
+    - ./samples:/samples:ro
+
+services:
+  demo:
+    <<: *npu
+    build: .
+    command: uvicorn demo.app:app --host 0.0.0.0 --port 8000
+    ports: ["8097:8000"]
+
+  # one-off: python tests/smoke.py  (runs every model on samples/, writes out/)
+  smoke:
+    <<: *npu
+    profiles: [tools]
+    restart: "no"
+    volumes:
+      - ${MODELS:-/mnt/data/npu-models}/hub/models:/hub:ro
+      - ${MODELS:-/mnt/data/npu-models}/hf:/hf
+      - ./zoo:/zoo-src/zoo:ro
+      - ./tests:/zoo-src/tests:ro
+      - ./samples:/samples:ro
+      - ./out:/out
+    command: python tests/smoke.py

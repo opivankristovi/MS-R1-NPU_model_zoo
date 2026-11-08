@@ -1,0 +1,15 @@
+# Template compose file for a zoo app. Copy with the folder; change the service name and port.
+services:
+  cutout:
+    image: npu-zoo                       # build it once: (cd ../.. && docker compose build)
+    devices: [/dev/aipu]
+    restart: unless-stopped
+    working_dir: /app
+    command: uvicorn app:app --host 0.0.0.0 --port 8000
+    environment: {ZOO_HUB: /hub, HF_HOME: /hf, PYTHONPATH: /zoo-src}
+    ports: ["8098:8000"]
+    volumes:
+      - ${MODELS:-/mnt/data/npu-models}/hub/models:/hub:ro
+      - ${MODELS:-/mnt/data/npu-models}/hf:/hf
+      - ../../zoo:/zoo-src/zoo:ro
+      - .:/app:ro
