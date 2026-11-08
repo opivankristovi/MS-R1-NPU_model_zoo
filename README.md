@@ -6,7 +6,7 @@ There's a web demo to try them, and a template for building apps on them.
 
 ## Requirements
 
-* A CIX P1 board (tested on a Radxa Orion O6) with the NPU kernel driver loaded: `cix-npu-driver-dkms`
+* A CIX P1 board (tested on a Minisforum MS-R1) with the NPU kernel driver loaded: `cix-npu-driver-dkms`
   6.2.0, which provides `/dev/aipu`. The user-space runtime must match it; `tools/fetch_runtime.sh` fetches
   the matching libnoe 3.1.2 from Radxa's `cix-prebuilt` 26Q2 release.
 * Docker with Compose.
