@@ -1,4 +1,4 @@
-# NPU model zoo (CIX P1 / Radxa Orion O6, Zhouyi X2 NPU)
+# NPU model zoo (MS-R1 / CIX P1 / Radxa Orion O6, Zhouyi X2 NPU)
 
 26 ready-to-use vision models from the **CIX AI Model Hub 25Q3**, wrapped in one small Python package (`zoo/`) with
 the same interface. Each model's pre- and post-processing has been worked out and tested on this board.
